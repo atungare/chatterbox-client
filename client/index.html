@@ -15,12 +15,16 @@
   <body>
     <div id="main">
       <h1>chatterbox</h1>
-      <!-- Your HTML goes here! -->
-      <!-- <button class="submit">Submit</button> -->
-      <!-- <form> -->
-        <input id="message" type="text">
-        <input id="send" class="submit" type="button" value="Submit">
-      <!-- </form> -->
+      <button class="switchUser">Change Username</button>
+      <button class='newRoom'>Make New Room</button>
+      <button class='refresh'>Refresh All Chat</button>
+      <form>
+        Current Room: <select id="room"></select>
+      </form>
+      <form id="send">
+        Message: <input id="message" type="text">
+        <input class="submit" type="submit" value="Submit Message">
+      </form>
       <div id="chats"></div>
       <div id="roomSelect"></div>
     </div>
