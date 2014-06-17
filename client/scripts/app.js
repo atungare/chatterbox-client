@@ -9,9 +9,28 @@ app.rooms = [];
 
 app.init = function(){
 
+  app.displayUser();
 
-  $(".username").on('click', function(){
-    app.addFriend();
+  $(".switchUser").on("click", function(){
+    var newName = prompt("Enter new user name:") || "anonymous";
+    if(app.isSafe(newName)){
+      app.user = newName;
+      app.displayUser();
+    }
+  });
+
+  $(".newRoom").on("click", function(){
+    app.addRoom();
+  });
+
+  $(".refresh").on('click', function(){
+    app.clearMessages();
+    app.fetch();
+  });
+
+  $("#room").on("change", function(){
+    app.clearMessages();
+    app.fetch($("#room").val());
   });
 
   $('#send').on('submit', function(e){
@@ -20,24 +39,15 @@ app.init = function(){
     app.handleSubmit();
   });
 
-  $(".refresh").on('click', function(){
-    app.clearMessages();
-    app.fetch();
+  $(".username").on('click', function(){
+    app.addFriend();
   });
-
-  $(".switchUser").on("click", function(){
-    var newName = prompt("Enter new user name:") || "anonymous";
-    if(app.isSafe(newName)){
-      app.user = newName;
-    }
-  });
-
-  $(".newRoom").on("click", function(){
-    app.addRoom();
-  });
-
 
   app.fetch();
+};
+
+app.displayUser = function() {
+  $("#username").text("Welcome, " +app.user + "!");
 };
 
 app.handleSubmit = function(){
@@ -52,6 +62,8 @@ app.handleSubmit = function(){
   };
 
   app.send(message);
+
+  $("#room").trigger("change");
 };
 
 app.send = function(message){
@@ -62,7 +74,6 @@ app.send = function(message){
     contentType: 'application/json',
     success: function(data) {
       console.log('chatterbox: Message sent', data);
-      $('.refresh').click();
     },
     error: function(data) {
       console.error('chatterbox: Failed to send message', data);
@@ -70,28 +81,28 @@ app.send = function(message){
   });
 };
 
-app.fetch = function(){
+app.fetch = function(room){
   $.ajax({
     url: app.server,
     type: 'GET',
     data: {order: "-createdAt"},
     success: function(data){
-      var counter = 0;
-      while( (counter < 100) && ($("#chats").children().length < 50) ){
-        app.addMessage(data['results'][counter]);
-        counter++;
-      }
-      app.clearRooms();
-      for(var i = 0; i < app.rooms.length; i++) {
-        var thisRoom = app.rooms[i];
-        $("#room").append("<option value=\""+thisRoom+"\">"+ thisRoom + "</option>");
+      var msgArr = data["results"];
+
+      if(!room || (room === "lobby")){
+        app.getCurrentRooms(msgArr);
+        for(var i = 0; i < msgArr.length; i++){
+          app.addMessage(msgArr[i]);
+        }
+      } else {
+        for(var i = 0; i < msgArr.length; i++){
+          if(msgArr[i]['roomname'] === room){
+            app.addMessage(msgArr[i]);
+          }
+        }
       }
     }
   });
-};
-
-app.clearRooms = function() {
-  $("#room").empty();
 };
 
 app.clearMessages = function() {
@@ -99,25 +110,49 @@ app.clearMessages = function() {
 };
 
 app.addMessage = function(message) {
-  if(app.isSafe(message.roomname) && app.isSafe(message.text) && app.isSafe(message.username)){
-    if(app.rooms.indexOf(message.roomname) === -1) {
-      app.rooms.push(message.roomname);
-    }
+  if(app.msgIsSafe(message)){
     var msg = "<div class=\""+message.roomname+"\"><h2 class=\"username\">" + message.username + "</h2><p class=\"txt\">" + message.text + "</p></div>";
     $("#chats").append(msg);
+  }
+};
+
+app.getCurrentRooms = function(msgArr) {
+  $("#room").empty();
+  $("#room").append("<option value=\"lobby\">Lobby</option>");
+
+  for(var i = 0; i < msgArr.length; i++) {
+    var curRoom = msgArr[i]["roomname"];
+    if(app.msgIsSafe(msgArr[i])) {
+      if(app.rooms.indexOf(curRoom) === -1) {
+        app.rooms.push(curRoom);
+      }
+    }
+  }
+
+  for(var i = 0; i < app.rooms.length; i++) {
+    var thisRoom = app.rooms[i];
+    $("#room").append("<option value=\""+thisRoom+"\">"+ thisRoom + "</option>");
   }
 };
 
 app.addRoom = function(){
   var newRoom = prompt("Enter new room name:") || "lobby";
   var newMessage = prompt("Enter your message:") || "Hello World!";
+
   if(app.isSafe(newRoom) && app.isSafe(newMessage)){
+    if(app.rooms.indexOf(newRoom) === -1) {
+      app.rooms.push(newRoom);
+    }
     var msg = {
       username: app.user,
       text: newMessage,
       roomname: newRoom,
     };
     app.send(msg);
+
+    $("#room").prepend("<option value=\""+newRoom+"\">"+ newRoom + "</option>");
+    $("#room").val(newRoom);
+    $("#room").trigger("change");
   }
 };
 
@@ -126,36 +161,54 @@ app.addFriend = function(){
 };
 
 app.isSafe = function(str){
+
   var isSafe = true;
-  if(typeof str !== 'string'){
+
+  if(typeof str !== "string"){
     isSafe = false;
-  } else if (str.indexOf("<") > -1){
+  } else if (str.length > 140){
     isSafe = false;
-  } else if (str.indexOf(">") > -1){
-    isSafe = false;
-  } else if (str.indexOf("\"") > -1){
-    isSafe = false;
-  } else if (str.indexOf("\/") > -1){
-    isSafe = false;
-  } else if (str.indexOf("\\") > -1){
-    isSafe = false;
-  } else if (str.indexOf("'") > -1){
-    isSafe = false;
-  } else if (str.indexOf("?") > -1){
-    isSafe = false;
-  } else if (str.indexOf("$") > -1){
-    isSafe = false;
-  } else if (str.indexOf("&") > -1){
-    isSafe = false;
-  } else if (str.indexOf("(") > -1){
-    isSafe = false;
-  } else if (str.indexOf(")") > -1){
-    isSafe = false;
-  } else if (str.indexOf("|") > -1){
-    isSafe = false;
+  } else {
+    var obj = {};
+
+    for(var i = 0; i < str.length; i++) {
+      obj[str[i]] = true;
+    }
+
+    if (obj.hasOwnProperty("<")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty(">")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("\"")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("\/")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("\\")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("'")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("?")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("$")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("&")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("(")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty(")")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("|")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty("%")){
+      isSafe = false;
+    }
   }
 
   return isSafe;
+};
+
+app.msgIsSafe = function(msg) {
+  return (app.isSafe(msg.roomname) && app.isSafe(msg.text) && app.isSafe(msg.username));
 };
 
 $(document).ready(function(){app.init();});
