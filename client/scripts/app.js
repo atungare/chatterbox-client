@@ -6,6 +6,7 @@ app.user = window.location.search.slice(10);
 app.server = 'https://api.parse.com/1/classes/chatterbox';
 
 app.rooms = [];
+app.friends = {};
 
 app.init = function(){
 
@@ -39,8 +40,8 @@ app.init = function(){
     app.handleSubmit();
   });
 
-  $(".username").on('click', function(){
-    app.addFriend();
+  $("#chats").on('click', ".username", function(){
+    app.addFriend($(this).text());
   });
 
   app.fetch();
@@ -88,7 +89,6 @@ app.fetch = function(room){
     data: {order: "-createdAt"},
     success: function(data){
       var msgArr = data["results"];
-
       if(!room || (room === "lobby")){
         app.getCurrentRooms(msgArr);
         for(var i = 0; i < msgArr.length; i++){
@@ -111,18 +111,24 @@ app.clearMessages = function() {
 
 app.addMessage = function(message) {
   if(app.msgIsSafe(message)){
-    var msg = "<div class=\""+message.roomname+"\"><h2 class=\"username\">" + message.username + "</h2><p class=\"txt\">" + message.text + "</p></div>";
-    $("#chats").append(msg);
+    var $msg = $("<div class=\""+message.roomname+"\"><h2 class=\"username\">" + message.username + "</h2><p class=\"txt\">" + message.text + "</p></div>");
+    if(app.friends.hasOwnProperty(message.username)) {
+      $msg.css("color", "blue");
+      $msg.find(".txt").css("font-weight", "bold");
+    }
+    $("#chats").append($msg);
   }
 };
 
 app.getCurrentRooms = function(msgArr) {
   $("#room").empty();
-  $("#room").append("<option value=\"lobby\">Lobby</option>");
+  if(app.rooms.indexOf('lobby') === -1) {
+    app.rooms.push('lobby');
+  }
 
   for(var i = 0; i < msgArr.length; i++) {
-    var curRoom = msgArr[i]["roomname"];
     if(app.msgIsSafe(msgArr[i])) {
+      var curRoom = msgArr[i]["roomname"];
       if(app.rooms.indexOf(curRoom) === -1) {
         app.rooms.push(curRoom);
       }
@@ -156,8 +162,14 @@ app.addRoom = function(){
   }
 };
 
-app.addFriend = function(){
+app.addFriend = function(friendName){
+  if(app.friends.hasOwnProperty(friendName)) {
+    delete app.friends[friendName];
+  } else {
+    app.friends[friendName] = true;
+  }
 
+  $("#room").trigger("change");
 };
 
 app.isSafe = function(str){
@@ -200,6 +212,8 @@ app.isSafe = function(str){
     } else if (obj.hasOwnProperty("|")){
       isSafe = false;
     } else if (obj.hasOwnProperty("%")){
+      isSafe = false;
+    } else if (obj.hasOwnProperty(";")){
       isSafe = false;
     }
   }
