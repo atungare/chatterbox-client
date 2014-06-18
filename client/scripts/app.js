@@ -5,10 +5,16 @@ var app = {};
 app.user = window.location.search.slice(10);
 app.server = 'https://api.parse.com/1/classes/chatterbox';
 
-app.rooms = [];
+app.rooms = {};
+app.currentRoom = 'lobby';
+
 app.friends = {};
 
 app.init = function(){
+
+  if(!app.isSafe(app.user)) {
+    app.user = 'anonymous';
+  }
 
   app.displayUser();
 
@@ -31,7 +37,8 @@ app.init = function(){
 
   $("#room").on("change", function(){
     app.clearMessages();
-    app.fetch($("#room").val());
+    app.currentRoom = $("#room").val();
+    app.fetch();
   });
 
   $('#send').on('submit', function(e){
@@ -82,27 +89,30 @@ app.send = function(message){
   });
 };
 
-app.fetch = function(room){
+app.fetch = function(){
   $.ajax({
     url: app.server,
     type: 'GET',
     data: {order: "-createdAt"},
     success: function(data){
-      var msgArr = data["results"];
-      if(!room || (room === "lobby")){
-        app.getCurrentRooms(msgArr);
-        for(var i = 0; i < msgArr.length; i++){
-          app.addMessage(msgArr[i]);
-        }
-      } else {
-        for(var i = 0; i < msgArr.length; i++){
-          if(msgArr[i]['roomname'] === room){
-            app.addMessage(msgArr[i]);
-          }
-        }
-      }
+      app.displayMessages(data["results"]);
     }
   });
+};
+
+app.displayMessages = function(msgArr) {
+  if(app.currentRoom === "lobby"){
+    app.getCurrentRooms(msgArr);
+    for(var i = 0; i < msgArr.length; i++){
+      app.addMessage(msgArr[i]);
+    }
+  } else {
+    for(var i = 0; i < msgArr.length; i++){
+      if(msgArr[i]['roomname'] === app.currentRoom){
+        app.addMessage(msgArr[i]);
+      }
+    }
+  }
 };
 
 app.clearMessages = function() {
@@ -122,21 +132,21 @@ app.addMessage = function(message) {
 
 app.getCurrentRooms = function(msgArr) {
   $("#room").empty();
-  if(app.rooms.indexOf('lobby') === -1) {
-    app.rooms.push('lobby');
+  if(!app.rooms.hasOwnProperty('lobby')) {
+    app.rooms['lobby'] = true;
   }
 
   for(var i = 0; i < msgArr.length; i++) {
     if(app.msgIsSafe(msgArr[i])) {
       var curRoom = msgArr[i]["roomname"];
-      if(app.rooms.indexOf(curRoom) === -1) {
-        app.rooms.push(curRoom);
+      if(!app.rooms.hasOwnProperty(curRoom)) {
+        app.rooms[curRoom] = true;
       }
     }
   }
 
-  for(var i = 0; i < app.rooms.length; i++) {
-    var thisRoom = app.rooms[i];
+  for(var k in app.rooms) {
+    var thisRoom = k;
     $("#room").append("<option value=\""+thisRoom+"\">"+ thisRoom + "</option>");
   }
 };
@@ -146,18 +156,22 @@ app.addRoom = function(){
   var newMessage = prompt("Enter your message:") || "Hello World!";
 
   if(app.isSafe(newRoom) && app.isSafe(newMessage)){
-    if(app.rooms.indexOf(newRoom) === -1) {
-      app.rooms.push(newRoom);
+    app.currentRoom = newRoom;
+
+    if(!app.rooms.hasOwnProperty(app.currentRoom)) {
+      app.rooms[app.currentRoom] = true;
     }
+
     var msg = {
       username: app.user,
       text: newMessage,
-      roomname: newRoom,
+      roomname: app.currentRoom,
     };
+
     app.send(msg);
 
-    $("#room").prepend("<option value=\""+newRoom+"\">"+ newRoom + "</option>");
-    $("#room").val(newRoom);
+    $("#room").prepend("<option value=\""+app.currentRoom+"\">"+ app.currentRoom + "</option>");
+    $("#room").val(app.currentRoom);
     $("#room").trigger("change");
   }
 };
